@@ -37,13 +37,15 @@ repository, and Netlify serves static files only, so a deploy here will load the
 shell and then show connection errors on the data screens until an API is
 reachable.
 
-To point a deployment at a live API:
+### Connecting a Netlify deploy to the API
 
-```bash
-flutter build web --release --dart-define=FINN_API=https://your-api.example.com
-```
+In Netlify, set the environment variable `FINN_API` to your backend's origin
+(for example `https://finn-api.example.com`) and redeploy. The build script then
+makes Netlify proxy `/api/*` to that backend, so the app calls its own origin
+and the backend needs no CORS setup.
 
-The API must send permissive CORS headers for the Netlify origin.
+If `FINN_API` isn't set, `/api/*` returns a JSON "backend not connected" error.
+Without that rule, those requests would get `index.html` from the SPA fallback.
 
 ## Local development
 

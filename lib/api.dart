@@ -31,9 +31,7 @@ class Api {
     final r = await http
         .get(Uri.parse('$base$path'))
         .timeout(const Duration(seconds: 25));
-    if (r.statusCode != 200) {
-      throw ApiException('$path → HTTP ${r.statusCode}');
-    }
+    if (r.statusCode != 200) throw ApiException(_errorText(path, r));
     final data = jsonDecode(r.body) as Map<String, dynamic>;
     _cache[key] = _CacheEntry(data, DateTime.now());
     return data;
@@ -44,8 +42,20 @@ class Api {
         .post(Uri.parse('$base$path'),
             headers: {'Content-Type': 'application/json'}, body: jsonEncode(body))
         .timeout(const Duration(seconds: 40));
-    if (r.statusCode != 200) throw ApiException('$path → HTTP ${r.statusCode}');
+    if (r.statusCode != 200) throw ApiException(_errorText(path, r));
     return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  /// Prefer the server's own `error`/`detail` message when the body is JSON.
+  String _errorText(String path, http.Response r) {
+    try {
+      final body = jsonDecode(r.body);
+      if (body is Map) {
+        final msg = body['error'] ?? body['detail'];
+        if (msg != null) return msg.toString();
+      }
+    } catch (_) {}
+    return '$path → HTTP ${r.statusCode}';
   }
 
   /// SSE stream for Ask FINN. Yields decoded events.
