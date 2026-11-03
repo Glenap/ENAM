@@ -47,3 +47,15 @@ app.*.map.json
 # Secrets
 .env
 .git-credentials
+
+# Flutter backend (Python)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+# Generated snapshot: rebuilt by `python3 -m finn.seed`, never committed
+backend/data/*.db
+backend/data/*.db-wal
+backend/data/*.db-shm
