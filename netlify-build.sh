@@ -28,10 +28,19 @@ flutter config --no-analytics >/dev/null
 flutter --version
 flutter pub get
 
-# The app reads its API base URL from the FINN_API compile-time define.
+# The app reads its API base URL from the FINN_API compile-time define if set.
 BUILD_ARGS=(--release)
 if [ -n "${FINN_API:-}" ]; then
   BUILD_ARGS+=("--dart-define=FINN_API=$FINN_API")
 fi
 
 flutter build web "${BUILD_ARGS[@]}"
+
+# If FINN_API is provided at deploy time, set up Netlify same-origin API proxying.
+API_ORIGIN="${FINN_API:-}"
+API_ORIGIN="${API_ORIGIN%/}"
+API_ORIGIN="${API_ORIGIN%/api}"
+if [ -n "$API_ORIGIN" ]; then
+  echo "Proxying /api/* to $API_ORIGIN"
+  printf '/api/*  %s/api/:splat  200!\n' "$API_ORIGIN" > "build/web/_redirects"
+fi

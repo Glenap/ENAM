@@ -13,8 +13,8 @@ import 'offline_data.dart';
 /// When the API cannot be reached at all — which is always the case on a static
 /// host such as Netlify, because the FastAPI backend is a separate process — the
 /// client serves the bundled demo snapshot in [Offline] so the interface stays
-/// navigable. Fallback only happens on a transport failure or a 404: a 500 from
-/// a live API is still surfaced, because that is a real error worth showing.
+/// navigable. Fallback happens on transport failure, HTML response, or 404/405:
+/// a 500 from a live API is still surfaced, because that is a real error worth showing.
 class Api {
   Api._();
   static final Api I = Api._();
@@ -42,9 +42,11 @@ class Api {
       final r = await http
           .get(Uri.parse('$base$path'))
           .timeout(const Duration(seconds: 25));
-      if (r.statusCode == 404 || r.statusCode == 405) {
-        // A static host answers a missing /api/* with 404. Treat that as "no
-        // backend attached" and fall back rather than showing an error.
+      if (r.statusCode == 404 ||
+          r.statusCode == 405 ||
+          (r.headers['content-type']?.contains('text/html') ?? false)) {
+        // A static host answers a missing /api/* with 404 or HTML index.html fallback.
+        // Treat that as "no backend attached" and fall back rather than showing an error.
         data = _fallback(path);
       } else if (r.statusCode != 200) {
         throw ApiException('$path → HTTP ${r.statusCode}');
@@ -54,7 +56,7 @@ class Api {
     } on ApiException {
       rethrow;
     } catch (_) {
-      // Transport failure: unreachable host, DNS, CORS, timeout.
+      // Transport failure: unreachable host, DNS, CORS, timeout, JSON parse error.
       data = _fallback(path);
     }
 
@@ -78,7 +80,11 @@ class Api {
           .post(Uri.parse('$base$path'),
               headers: {'Content-Type': 'application/json'}, body: jsonEncode(body))
           .timeout(const Duration(seconds: 40));
-      if (r.statusCode == 404 || r.statusCode == 405) return _fallback(path);
+      if (r.statusCode == 404 ||
+          r.statusCode == 405 ||
+          (r.headers['content-type']?.contains('text/html') ?? false)) {
+        return _fallback(path);
+      }
       if (r.statusCode != 200) throw ApiException('$path → HTTP ${r.statusCode}');
       return jsonDecode(r.body) as Map<String, dynamic>;
     } on ApiException {
@@ -101,10 +107,13 @@ class Api {
         ..body = jsonEncode(body);
       client = http.Client();
       final resp = await client.send(req).timeout(const Duration(seconds: 45));
-      if (resp.statusCode == 404 || resp.statusCode == 405) {
+      if (resp.statusCode == 404 ||
+          resp.statusCode == 405 ||
+          (resp.headers['content-type']?.contains('text/html') ?? false)) {
         yield* _offlineStream(body);
         return;
       }
+      var emitted = false;
       final buf = StringBuffer();
       await for (final chunk in resp.stream.transform(utf8.decoder)) {
         buf.write(chunk);
@@ -121,12 +130,16 @@ class Api {
             if (payload.isEmpty) continue;
             try {
               yield jsonDecode(payload) as Map<String, dynamic>;
+              emitted = true;
             } catch (_) {/* malformed frame: skip rather than kill the stream */}
           }
         }
         buf
           ..clear()
           ..write(text);
+      }
+      if (!emitted) {
+        yield* _offlineStream(body);
       }
     } catch (_) {
       // Transport failure: serve the canned answer instead of a dead stream.

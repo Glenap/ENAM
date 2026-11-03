@@ -3,6 +3,14 @@
   # Flutter is not preinstalled on Netlify; the script installs it, then builds.
   command = "bash netlify-build.sh"
 
+# Any /api/* request when no backend proxy is attached must return 404,
+# so the Flutter web app cleanly falls back to the bundled offline snapshot
+# instead of receiving index.html (which would cause a JSON parse error).
+[[redirects]]
+  from = "/api/*"
+  to = "/404.json"
+  status = 404
+
 # Flutter web is a single-page app: unknown paths must fall back to index.html
 [[redirects]]
   from = "/*"

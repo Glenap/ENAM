@@ -1,11 +1,11 @@
 {
-    "name": "finn",
-    "short_name": "finn",
+    "name": "FINN — Financial Investment Agent",
+    "short_name": "FINN",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0A0B0E",
+    "theme_color": "#0A0B0E",
+    "description": "Mobile-first financial investment agent: briefing feed, research lenses, and promise ledger.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
