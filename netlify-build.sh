@@ -28,10 +28,26 @@ flutter config --no-analytics >/dev/null
 flutter --version
 flutter pub get
 
-# The app reads its API base URL from the FINN_API compile-time define.
-BUILD_ARGS=(--release)
-if [ -n "${FINN_API:-}" ]; then
-  BUILD_ARGS+=("--dart-define=FINN_API=$FINN_API")
-fi
+# API wiring. The FINN FastAPI backend is hosted separately. Set FINN_API in the
+# Netlify environment variables to its origin (e.g. https://finn-api.example.com).
+# Netlify then proxies /api/* to it, so the app calls its own origin: no CORS
+# setup is needed on the backend. The app itself is built without a base URL
+# so it always uses same-origin /api/* paths.
+flutter build web --release
 
-flutter build web "${BUILD_ARGS[@]}"
+API_ORIGIN="${FINN_API:-}"
+API_ORIGIN="${API_ORIGIN%/}"
+API_ORIGIN="${API_ORIGIN%/api}"
+REDIRECTS="build/web/_redirects"
+if [ -n "$API_ORIGIN" ]; then
+  echo "Proxying /api/* to $API_ORIGIN"
+  printf '/api/*  %s/api/:splat  200!\n' "$API_ORIGIN" > "$REDIRECTS"
+else
+  # Without this, /api/* falls through to the SPA fallback and the app gets
+  # index.html instead of JSON ("Unexpected token '<'").
+  echo "WARNING: FINN_API is not set; /api/* will return a 'not configured' error."
+  cat > build/web/api-not-configured.json <<'JSON'
+{"error": "FINN backend not connected. Set the FINN_API environment variable in Netlify to your API's URL and redeploy."}
+JSON
+  printf '/api/*  /api-not-configured.json  404!\n' > "$REDIRECTS"
+fi
